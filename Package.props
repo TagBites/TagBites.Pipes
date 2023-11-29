@@ -11,5 +11,7 @@
 
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/TagBites/TagBites.Pipes.git</RepositoryUrl>
+
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 </Project>

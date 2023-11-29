@@ -6,8 +6,11 @@ internal static class NamedPipeUtils
 {
 #if true
 
-    public static string Encode(string input)
+    public static string Encode(string? input)
     {
+        if (string.IsNullOrEmpty(input))
+            return string.Empty;
+
         var sb = new StringBuilder(input.Length);
 
         foreach (var c in input)
@@ -56,8 +59,11 @@ internal static class NamedPipeUtils
         return sb.ToString();
     }
 
-    public static string Decode(string input)
+    public static string Decode(string? input)
     {
+        if (string.IsNullOrEmpty(input))
+            return string.Empty;
+
         var sb = new StringBuilder(input.Length);
         var escape = false;
 

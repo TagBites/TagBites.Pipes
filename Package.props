@@ -1,0 +1,15 @@
+<Project>
+  <PropertyGroup>
+    <Description>C# library for simple inter-process communication using named pipes.</Description>
+    <PackageTags>ipc;pipes;dotnet;csharp</PackageTags>
+
+    <PackageProjectUrl>https://github.com/TagBites/TagBites.Pipes</PackageProjectUrl>
+    <PackageIconUrl></PackageIconUrl>
+
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/TagBites/TagBites.Pipes.git</RepositoryUrl>
+  </PropertyGroup>
+</Project>

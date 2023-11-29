@@ -1,0 +1,8 @@
+﻿<Project>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>LicenseVerifyKey</_Parameter1>
+      <_Parameter2>BgIAAAAiAABEU1MxAAQAAImtHhG2lvz7CY91cD1z+krdIlWVsG9D/8yPmRAtCnrSRJLuu0fBCKWzJpm8q/pD7cp0UtHfW2E/FslNZAzgduA+X1oH5/FQEpeR7yX57ysH7DIuIaOhm7Ldg6UuEbp5OcbbUUDlyEuXUsPTae/Qi1SRaJHakF06KN3Vm3sjUYzNPR7Nqznc3ZyifeM2Y50j8XOgO70Hg//47YanhCMG4oHGaBEjQBIeR2rlPhUNHrUcPk1Z8rE0uV0FX48U5eeYQ6Nx+o2ScW8l8zLK31VoVY4hhZh+YAJKXGl95rNIkJUzc/yd7zfsVi9DuFwscE3Yiz/HaHWTWG4iglCIIhW/ZDDM1nylflGNmvU43m4n7USBPatkRgzNeHBy652lDD21Eq8+FdF8UISzztD2PiuBuyaufjYnYOGT46CmP7vtlXXogvS9Znl7KBPGA/lj9B7rVrXuvnqKc3Po+ApwzyvMerml9sNH1mBK1lC3xpuXDX7rnnFmcSCpvKpRLXrc+TngR7pns69NIUT+xKFno7jd12eqSAe7PAYAAIb5IsKUDFQkzu8+erQ3rcNOXQV7</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

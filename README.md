@@ -1,5 +1,8 @@
 # TagBites.Pipes
 
+[![Nuget](https://img.shields.io/nuget/v/TagBites.Pipes.svg)](https://www.nuget.org/packages/TagBites.Pipes/)
+[![License](http://img.shields.io/github/license/TagBites/TagBites.Pipes)](https://github.com/TagBites/TagBites.Pipes/blob/master/LICENSE)
+
 C# library for simple inter-process communication using named pipes.
 
 ## Sync Example

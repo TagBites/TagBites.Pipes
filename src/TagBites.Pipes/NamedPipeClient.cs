@@ -10,6 +10,7 @@ public class NamedPipeClient : IDisposable
     private StreamWriter? _writer;
 
     public string PipeName { get; }
+    public bool IsConnected { get; private set; }
 
     public NamedPipeClient(string pipeName) => PipeName = pipeName;
 
@@ -18,26 +19,40 @@ public class NamedPipeClient : IDisposable
     public void Connect(int timeout)
     {
         if (_client != null)
-            throw new InvalidOperationException();
+        {
+            if (IsConnected)
+                return;
+
+            Dispose();
+        }
 
         _client = new NamedPipeClientStream(".", PipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
         _client.Connect(timeout);
 
         _reader = new StreamReader(_client);
         _writer = new StreamWriter(_client) { AutoFlush = true };
+
+        IsConnected = true;
     }
 
     public Task ConnectAsync() => ConnectAsync(100, CancellationToken.None);
     public async Task ConnectAsync(int timeout, CancellationToken token)
     {
         if (_client != null)
-            throw new InvalidOperationException();
+        {
+            if (IsConnected)
+                return;
+
+            Dispose();
+        }
 
         _client = new NamedPipeClientStream(PipeName);
         await _client.ConnectAsync(timeout, token).ConfigureAwait(false);
 
         _reader = new StreamReader(_client);
         _writer = new StreamWriter(_client) { AutoFlush = true };
+
+        IsConnected = true;
     }
 
     public string SendRequest(string address, string message)
@@ -79,6 +94,7 @@ public class NamedPipeClient : IDisposable
         }
         catch (IOException)
         {
+            IsConnected = false;
             throw new NamedPipeConnectionLostException();
         }
     }
@@ -121,6 +137,7 @@ public class NamedPipeClient : IDisposable
         }
         catch (IOException)
         {
+            IsConnected = false;
             throw new NamedPipeConnectionLostException();
         }
     }

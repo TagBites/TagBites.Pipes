@@ -4,9 +4,14 @@ namespace TagBites.Pipes;
 
 internal static class NamedPipeUtils
 {
-#if true
+    public const int LegacyEncodeVersion = 1;
+    public const int CurrentEncodeVersion = 2;
 
-    public static string Encode(string? input)
+
+    public static Func<string?, string> GetEncoder(int version) => version > 1 ? Encode2 : Encode;
+    public static Func<string, string> GetDecoder(int version) => version > 1 ? Decode2 : Decode;
+
+    private static string Encode2(string? input)
     {
         if (string.IsNullOrEmpty(input))
             return string.Empty;
@@ -58,8 +63,7 @@ internal static class NamedPipeUtils
 
         return sb.ToString();
     }
-
-    public static string Decode(string? input)
+    private static string Decode2(string? input)
     {
         if (string.IsNullOrEmpty(input))
             return string.Empty;
@@ -131,9 +135,7 @@ internal static class NamedPipeUtils
         return sb.ToString();
     }
 
-#else
-
-    public static string Encode(string? text)
+    private static string Encode(string? text)
     {
         if (string.IsNullOrEmpty(text))
             return string.Empty;
@@ -144,7 +146,7 @@ internal static class NamedPipeUtils
         value = value.TrimEnd();
         return value;
     }
-    public static string Decode(string? response)
+    private static string Decode(string? response)
     {
         if (string.IsNullOrEmpty(response))
             return string.Empty;
@@ -178,6 +180,4 @@ internal static class NamedPipeUtils
 
         return s;
     }
-
-#endif
 }

@@ -10,8 +10,10 @@ public class NamedPipeServer : IDisposable
     private Task? _waitForConnectionsTask;
     private CancellationTokenSource? _cancellationTokenSource;
 
-    public string PipeName { get; }
     public event EventHandler<NamedPipeRequestEventArgs>? Request;
+
+    public string PipeName { get; }
+    public bool SupportLegacyEncoding { get; set; }
 
     public bool Enabled
     {
@@ -63,51 +65,65 @@ public class NamedPipeServer : IDisposable
         try
         {
             using var context = new NamedPipeConnectionContext();
+            context.EncodeVersion = SupportLegacyEncoding ? NamedPipeUtils.LegacyEncodeVersion : NamedPipeUtils.CurrentEncodeVersion;
+
             using var reader = new StreamReader(pipe);
             await using var writer = new StreamWriter(pipe);
-
             writer.AutoFlush = true;
 
             while (!token.IsCancellationRequested)
             {
                 // Input
-                var address = await ReadLineAsync(reader).ConfigureAwait(false);
-                var message = await ReadLineAsync(reader).ConfigureAwait(false);
+                var address = await ReadLineAsync(context, reader).ConfigureAwait(false);
+                var message = await ReadLineAsync(context, reader).ConfigureAwait(false);
 
-                // Execute
                 string? response = null;
                 Exception? exception = null;
 
-                try
+                // Internal command
+                if (address.StartsWith("--"))
                 {
-                    var e = new NamedPipeRequestEventArgs(context, address, message);
-                    Request?.Invoke(this, e);
-
-                    if (e.ResultTask is { } t)
-                        await t.ConfigureAwait(false);
-
-                    response = e.Response;
+                    if (address == InternalCommandNames.ConfigEncodeVersion)
+                        if (int.TryParse(message, out var version))
+                        {
+                            context.EncodeVersion = Math.Max(NamedPipeUtils.LegacyEncodeVersion, Math.Min(NamedPipeUtils.CurrentEncodeVersion, version));
+                            response = context.EncodeVersion.ToString();
+                        }
                 }
-                catch (Exception ex)
+                // Execute
+                else
                 {
-                    exception = ex;
+                    try
+                    {
+                        var e = new NamedPipeRequestEventArgs(context, address, message);
+                        Request?.Invoke(this, e);
+
+                        if (e.ResultTask is { } t)
+                            await t.ConfigureAwait(false);
+
+                        response = e.Response;
+                    }
+                    catch (Exception ex)
+                    {
+                        exception = ex;
+                    }
                 }
 
                 // Response
                 if (exception == null)
                 {
-                    await WriteLineAsync(writer, "ok").ConfigureAwait(false);
-                    await WriteLineAsync(writer, response).ConfigureAwait(false);
+                    await WriteLineAsync(context, writer, "ok").ConfigureAwait(false);
+                    await WriteLineAsync(context, writer, response).ConfigureAwait(false);
                 }
                 else
                 {
                     if (exception is TargetInvocationException ti)
                         exception = ti.InnerException ?? exception;
 
-                    await WriteLineAsync(writer, "exception").ConfigureAwait(false);
-                    await WriteLineAsync(writer, exception.GetType().FullName).ConfigureAwait(false);
-                    await WriteLineAsync(writer, exception.Message).ConfigureAwait(false);
-                    await WriteLineAsync(writer, exception.StackTrace).ConfigureAwait(false);
+                    await WriteLineAsync(context, writer, "exception").ConfigureAwait(false);
+                    await WriteLineAsync(context, writer, exception.GetType().FullName).ConfigureAwait(false);
+                    await WriteLineAsync(context, writer, exception.Message).ConfigureAwait(false);
+                    await WriteLineAsync(context, writer, exception.StackTrace).ConfigureAwait(false);
                 }
 
                 pipe.WaitForPipeDrain();
@@ -121,15 +137,15 @@ public class NamedPipeServer : IDisposable
 
     public void Dispose() => Enabled = false;
 
-    private static async ValueTask WriteLineAsync(StreamWriter writer, string? value)
+    private async ValueTask WriteLineAsync(NamedPipeConnectionContext context, StreamWriter writer, string? value)
     {
-        value = NamedPipeUtils.Encode(value);
+        value = NamedPipeUtils.GetEncoder(context.EncodeVersion)(value);
         await writer.WriteLineAsync(value).ConfigureAwait(false);
     }
-    private static async ValueTask<string> ReadLineAsync(StreamReader reader)
+    private async ValueTask<string> ReadLineAsync(NamedPipeConnectionContext context, StreamReader reader)
     {
         var response = await reader.ReadLineAsync().ConfigureAwait(false);
-        response = NamedPipeUtils.Decode(response);
+        response = NamedPipeUtils.GetDecoder(context.EncodeVersion)(response);
         return response;
     }
 }

@@ -11,6 +11,8 @@ public class NamedPipeConnectionContext : IDisposable
     public NamedPipeConnectionBag Bag { get; } = new();
     public bool IsDisposed { get; private set; }
 
+    internal int EncodeVersion { get; set; }
+
 
     void IDisposable.Dispose()
     {

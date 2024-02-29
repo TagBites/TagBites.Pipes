@@ -12,6 +12,8 @@ public class NamedPipeClient : IDisposable
     public string PipeName { get; }
     public bool IsConnected { get; private set; }
 
+    internal int EncodeVersion { get; set; }
+
     public NamedPipeClient(string pipeName) => PipeName = pipeName;
 
 
@@ -32,6 +34,10 @@ public class NamedPipeClient : IDisposable
         _reader = new StreamReader(_client);
         _writer = new StreamWriter(_client) { AutoFlush = true };
 
+        // Config
+        _ = ProcessConfigAsync(true);
+
+        // Connected
         IsConnected = true;
     }
 
@@ -52,9 +58,36 @@ public class NamedPipeClient : IDisposable
         _reader = new StreamReader(_client);
         _writer = new StreamWriter(_client) { AutoFlush = true };
 
+        // Config
+        await ProcessConfigAsync(true).ConfigureAwait(false);
+
+        // Connected
         IsConnected = true;
     }
 
+    private async Task ProcessConfigAsync(bool sync)
+    {
+        // Config
+        if (EncodeVersion == 0)
+            try
+            {
+                var response = await SendRequestAsync(InternalCommandNames.ConfigEncodeVersion, NamedPipeUtils.CurrentEncodeVersion.ToString(), sync);
+                if (int.TryParse(response, out var encodeVersion))
+                    EncodeVersion = encodeVersion;
+            }
+            catch
+            {
+                EncodeVersion = 1;
+            }
+    }
+
+    private async Task<string> SendRequestAsync(string command, string message, bool sync)
+    {
+        // ReSharper disable once MethodHasAsyncOverload
+        return sync
+            ? SendRequest(command, message)
+            : await SendRequestAsync(command, message).ConfigureAwait(false);
+    }
     public string SendRequest(string address, string message)
     {
         if (_client == null)
@@ -144,7 +177,7 @@ public class NamedPipeClient : IDisposable
 
     private void WriteLine(string value)
     {
-        value = NamedPipeUtils.Encode(value);
+        value = NamedPipeUtils.GetEncoder(EncodeVersion)(value);
         _writer!.WriteLine(value);
     }
     private string ReadLine()
@@ -153,19 +186,19 @@ public class NamedPipeClient : IDisposable
             return string.Empty;
 
         var response = _reader.ReadLine();
-        response = NamedPipeUtils.Decode(response);
+        response = NamedPipeUtils.GetDecoder(EncodeVersion)(response);
         return response;
     }
 
     private async ValueTask WriteLineAsync(string value)
     {
-        value = NamedPipeUtils.Encode(value);
+        value = NamedPipeUtils.GetEncoder(EncodeVersion)(value);
         await _writer!.WriteLineAsync(value).ConfigureAwait(false);
     }
     private async ValueTask<string> ReadLineAsync()
     {
         var response = await _reader!.ReadLineAsync().ConfigureAwait(false);
-        response = NamedPipeUtils.Decode(response);
+        response = NamedPipeUtils.GetDecoder(EncodeVersion)(response);
         return response;
     }
 

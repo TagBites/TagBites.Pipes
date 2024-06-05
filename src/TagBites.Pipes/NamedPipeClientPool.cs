@@ -10,7 +10,6 @@ public class NamedPipeClientPool : IDisposable
     private readonly ConcurrentBag<NamedPipeClient> _connections;
 
     public string PipeName { get; }
-    private int EncodeVersion { get; set; }
 
     public NamedPipeClientPool(string pipeName, int maxConnections)
     {
@@ -55,19 +54,11 @@ public class NamedPipeClientPool : IDisposable
         _semaphore.Wait();
 
         if (!_connections.TryTake(out var connection))
-        {
             connection = new NamedPipeClient(PipeName);
-            if (EncodeVersion > 0)
-                connection.EncodeVersion = EncodeVersion;
-        }
 
         try
         {
             connection.Connect();
-
-            if (EncodeVersion == 0)
-                EncodeVersion = connection.EncodeVersion;
-
             return connection;
         }
         catch
@@ -81,19 +72,11 @@ public class NamedPipeClientPool : IDisposable
         await _semaphore.WaitAsync().ConfigureAwait(false);
 
         if (!_connections.TryTake(out var connection))
-        {
             connection = new NamedPipeClient(PipeName);
-            if (EncodeVersion > 0)
-                connection.EncodeVersion = EncodeVersion;
-        }
 
         try
         {
             await connection.ConnectAsync().ConfigureAwait(false);
-
-            if (EncodeVersion == 0)
-                EncodeVersion = connection.EncodeVersion;
-
             return connection;
         }
         catch

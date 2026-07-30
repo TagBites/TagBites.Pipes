@@ -8,6 +8,18 @@ public class NamedPipeClientPoolLink : IDisposable
 
     public string PipeName => _pool.PipeName;
     public bool IsConnected => _client?.IsConnected ?? false;
+    public bool IsDisposed => _client == null;
+
+    private NamedPipeClient Client
+    {
+        get
+        {
+            if (_client == null)
+                throw new ObjectDisposedException(null);
+
+            return _client;
+        }
+    }
 
     internal NamedPipeClientPoolLink(NamedPipeClientPool pool, NamedPipeClient client)
     {
@@ -16,25 +28,22 @@ public class NamedPipeClientPoolLink : IDisposable
     }
 
 
-    public void Connect() => _client!.Connect();
-    public void Connect(int timeout) => _client!.Connect(timeout);
+    public void Connect() => Client.Connect();
+    public void Connect(int timeout) => Client.Connect(timeout);
 
-    public Task ConnectAsync() => _client!.ConnectAsync();
-    public Task ConnectAsync(int timeout, CancellationToken token) => _client!.ConnectAsync(timeout, token);
+    public Task ConnectAsync() => Client.ConnectAsync();
+    public Task ConnectAsync(int timeout, CancellationToken token) => Client.ConnectAsync(timeout, token);
 
-    public string SendRequest(string address, string message) => _client!.SendRequest(address, message);
-    public Task<string> SendRequestAsync(string address, string message) => _client!.SendRequestAsync(address, message);
+    public string SendRequest(string address, string message) => Client.SendRequest(address, message);
+    public Task<string> SendRequestAsync(string address, string message) => Client.SendRequestAsync(address, message);
 
     public void Dispose()
     {
-        if (_client != null)
-            try
-            {
-                _pool.ReturnConnection(_client);
-            }
-            finally
-            {
-                _client = null;
-            }
+        var client = _client;
+        if (client == null)
+            return;
+
+        _client = null;
+        _pool.ReturnConnection(client);
     }
 }

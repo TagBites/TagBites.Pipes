@@ -5,14 +5,20 @@ namespace TagBites.Pipes;
 [PublicAPI]
 public class NamedPipeClientPool : IDisposable
 {
-    private SemaphoreSlim _semaphore;
+    private readonly SemaphoreSlim _semaphore;
     private readonly int _maxConnections;
     private readonly ConcurrentBag<NamedPipeClient> _connections;
 
     public string PipeName { get; }
+    public bool IsDisposed { get; private set; }
 
     public NamedPipeClientPool(string pipeName, int maxConnections)
     {
+        if (pipeName == null)
+            throw new ArgumentNullException(nameof(pipeName));
+        if (maxConnections < 1)
+            throw new ArgumentOutOfRangeException(nameof(maxConnections));
+
         PipeName = pipeName;
 
         _maxConnections = maxConnections;
@@ -51,11 +57,10 @@ public class NamedPipeClientPool : IDisposable
 
     private NamedPipeClient GetConnectionCore()
     {
+        ThrowIfDisposed();
         _semaphore.Wait();
 
-        if (!_connections.TryTake(out var connection))
-            connection = new NamedPipeClient(PipeName);
-
+        var connection = TakeConnection();
         try
         {
             connection.Connect();
@@ -63,17 +68,17 @@ public class NamedPipeClientPool : IDisposable
         }
         catch
         {
+            connection.Dispose();
             _semaphore.Release();
             throw;
         }
     }
     private async Task<NamedPipeClient> GetConnectionCoreAsync()
     {
+        ThrowIfDisposed();
         await _semaphore.WaitAsync().ConfigureAwait(false);
 
-        if (!_connections.TryTake(out var connection))
-            connection = new NamedPipeClient(PipeName);
-
+        var connection = TakeConnection();
         try
         {
             await connection.ConnectAsync().ConfigureAwait(false);
@@ -81,35 +86,52 @@ public class NamedPipeClientPool : IDisposable
         }
         catch
         {
+            connection.Dispose();
             _semaphore.Release();
             throw;
         }
     }
+    private NamedPipeClient TakeConnection()
+    {
+        while (_connections.TryTake(out var connection))
+        {
+            if (connection.IsConnected)
+                return connection;
+
+            connection.Dispose();
+        }
+
+        return new NamedPipeClient(PipeName);
+    }
     internal void ReturnConnection(NamedPipeClient connection)
     {
-        _connections.Add(connection);
+        if (connection.IsConnected && !IsDisposed)
+            _connections.Add(connection);
+        else
+            connection.Dispose();
+
         _semaphore.Release();
     }
 
     public void Dispose()
     {
-        while (_semaphore.CurrentCount == _maxConnections)
+        if (IsDisposed)
+            return;
+
+        IsDisposed = true;
+
+        // Waits for every connection to come back
+        for (var i = 0; i < _maxConnections; i++)
             _semaphore.Wait();
 
-        foreach (var connection in _connections)
+        while (_connections.TryTake(out var connection))
             connection.Dispose();
 
-        try
-        {
-            _semaphore.Dispose();
-        }
-        catch
-        {
-            // ignored
-        }
-        finally
-        {
-            _semaphore = null!;
-        }
+        _semaphore.Dispose();
+    }
+    private void ThrowIfDisposed()
+    {
+        if (IsDisposed)
+            throw new ObjectDisposedException(null);
     }
 }

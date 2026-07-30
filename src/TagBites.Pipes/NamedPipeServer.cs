@@ -124,7 +124,7 @@ public class NamedPipeServer : IDisposable
                 Exception? exception = null;
 
                 // Internal command
-                if (address.StartsWith("--"))
+                if (address.StartsWith(InternalCommandNames.Prefix))
                 {
                     if (address == InternalCommandNames.ConfigEncodeVersion)
                         if (int.TryParse(message, out var version))

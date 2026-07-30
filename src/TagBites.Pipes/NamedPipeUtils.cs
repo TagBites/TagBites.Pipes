@@ -4,6 +4,7 @@ namespace TagBites.Pipes;
 
 internal static class NamedPipeUtils
 {
+    public const int UnknownEncodeVersion = 0;
     public const int LegacyEncodeVersion = 1;
     public const int CurrentEncodeVersion = 2;
 

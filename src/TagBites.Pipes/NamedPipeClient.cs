@@ -127,8 +127,7 @@ public class NamedPipeClient : IDisposable
         }
         catch (IOException)
         {
-            IsConnected = false;
-            throw new NamedPipeConnectionLostException();
+            throw ConnectionLost();
         }
     }
     public async Task<string> SendRequestAsync(string address, string message)
@@ -170,8 +169,7 @@ public class NamedPipeClient : IDisposable
         }
         catch (IOException)
         {
-            IsConnected = false;
-            throw new NamedPipeConnectionLostException();
+            throw ConnectionLost();
         }
     }
 
@@ -182,12 +180,11 @@ public class NamedPipeClient : IDisposable
     }
     private string ReadLine()
     {
-        if (_reader!.Peek() == 0)
-            return string.Empty;
+        var line = _reader!.ReadLine();
+        if (line == null)
+            throw ConnectionLost();
 
-        var response = _reader.ReadLine();
-        response = NamedPipeUtils.GetDecoder(EncodeVersion)(response);
-        return response;
+        return NamedPipeUtils.GetDecoder(EncodeVersion)(line);
     }
 
     private async ValueTask WriteLineAsync(string value)
@@ -197,9 +194,17 @@ public class NamedPipeClient : IDisposable
     }
     private async ValueTask<string> ReadLineAsync()
     {
-        var response = await _reader!.ReadLineAsync().ConfigureAwait(false);
-        response = NamedPipeUtils.GetDecoder(EncodeVersion)(response);
-        return response;
+        var line = await _reader!.ReadLineAsync().ConfigureAwait(false);
+        if (line == null)
+            throw ConnectionLost();
+
+        return NamedPipeUtils.GetDecoder(EncodeVersion)(line);
+    }
+
+    private NamedPipeConnectionLostException ConnectionLost()
+    {
+        IsConnected = false;
+        return new NamedPipeConnectionLostException();
     }
 
     public void Dispose()

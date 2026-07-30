@@ -112,7 +112,13 @@ public class NamedPipeServer : IDisposable
             {
                 // Input
                 var address = await ReadLineAsync(context, reader).ConfigureAwait(false);
-                var message = await ReadLineAsync(context, reader).ConfigureAwait(false);
+                var message = address != null
+                    ? await ReadLineAsync(context, reader).ConfigureAwait(false)
+                    : null;
+
+                // End of stream
+                if (address == null || message == null)
+                    break;
 
                 string? response = null;
                 Exception? exception = null;
@@ -193,10 +199,11 @@ public class NamedPipeServer : IDisposable
         value = NamedPipeUtils.GetEncoder(context.EncodeVersion)(value);
         await writer.WriteLineAsync(value).ConfigureAwait(false);
     }
-    private async ValueTask<string> ReadLineAsync(NamedPipeConnectionContext context, StreamReader reader)
+    private async ValueTask<string?> ReadLineAsync(NamedPipeConnectionContext context, StreamReader reader)
     {
-        var response = await reader.ReadLineAsync().ConfigureAwait(false);
-        response = NamedPipeUtils.GetDecoder(context.EncodeVersion)(response);
-        return response;
+        var line = await reader.ReadLineAsync().ConfigureAwait(false);
+        return line != null
+            ? NamedPipeUtils.GetDecoder(context.EncodeVersion)(line)
+            : null;
     }
 }

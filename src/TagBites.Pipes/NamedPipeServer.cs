@@ -6,62 +6,99 @@ namespace TagBites.Pipes;
 [PublicAPI]
 public class NamedPipeServer : IDisposable
 {
+    private readonly object _lock = new();
     private bool _enabled;
-    private Task? _waitForConnectionsTask;
     private CancellationTokenSource? _cancellationTokenSource;
 
     public event EventHandler<NamedPipeRequestEventArgs>? Request;
 
     public string PipeName { get; }
     public bool SupportLegacyEncoding { get; set; }
+    public bool IsDisposed { get; private set; }
 
     public bool Enabled
     {
         get => _enabled;
         set
         {
-            if (_enabled != value)
+            if (value)
+                ThrowIfDisposed();
+
+            lock (_lock)
             {
+                if (_enabled == value)
+                    return;
+
                 _enabled = value;
 
-                if (_enabled)
+                if (value)
                 {
                     _cancellationTokenSource = new CancellationTokenSource();
-                    _waitForConnectionsTask = _waitForConnectionsTask?.ContinueWith(t => Task.Run(WaitForConnections))
-                                              ?? Task.Run(WaitForConnections);
+
+                    // Fire and forget. The pipe is created before the first await,
+                    // so the server is listening once this setter returns.
+                    _ = ListeningCoreAsync(_cancellationTokenSource.Token);
                 }
                 else
                 {
-                    _cancellationTokenSource!.Cancel();
+                    var cancellationTokenSource = _cancellationTokenSource;
+                    _cancellationTokenSource = null;
+
+                    // Cancel runs the callbacks on this thread, so every pipe closes before the setter returns.
+                    // Cancelling in the background would leave an instance listening with nobody to serve it.
+                    cancellationTokenSource?.Cancel();
+                    cancellationTokenSource?.Dispose();
                 }
             }
         }
     }
 
-    public NamedPipeServer(string pipeName) => PipeName = pipeName;
-
-
-    private async Task WaitForConnections()
+    public NamedPipeServer(string pipeName)
     {
-        while (Enabled)
+        if (pipeName == null)
+            throw new ArgumentNullException(nameof(pipeName));
+
+        PipeName = pipeName;
+    }
+
+
+    private async Task ListeningCoreAsync(CancellationToken token)
+    {
+        while (!token.IsCancellationRequested)
         {
-            var token = _cancellationTokenSource!.Token;
-
             var pipe = new NamedPipeServerStream(PipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Message, PipeOptions.Asynchronous);
-            await pipe.WaitForConnectionAsync(token).ConfigureAwait(false);
+            var connected = false;
 
-            if (!Enabled)
-                await pipe.DisposeAsync().ConfigureAwait(false);
-            else
-                ProcessPipe(pipe, token);
+            // A cancelled wait would leave the instance listening
+            using (token.Register(pipe.Dispose))
+            {
+                try
+                {
+                    await pipe.WaitForConnectionAsync(token).ConfigureAwait(false);
+                    connected = !token.IsCancellationRequested;
+                }
+                catch (Exception e) when (e is OperationCanceledException or ObjectDisposedException or IOException)
+                { /* ignored */ }
+            }
+
+            if (!connected)
+            {
+                pipe.Dispose();
+                break;
+            }
+
+            ProcessPipe(pipe, token);
         }
     }
     private void ProcessPipe(NamedPipeServerStream pipe, CancellationToken token)
     {
-        Task.Run(() => ProcessPipeTask(pipe, token), token);
+        _ = Task.Run(() => ProcessPipeAsync(pipe, token));
     }
-    private async Task ProcessPipeTask(NamedPipeServerStream pipe, CancellationToken token)
+    private async Task ProcessPipeAsync(NamedPipeServerStream pipe, CancellationToken token)
     {
+        // Unblocks the pending read
+        using var registration = token.Register(pipe.Dispose);
+
         try
         {
             using var context = new NamedPipeConnectionContext();
@@ -129,13 +166,27 @@ public class NamedPipeServer : IDisposable
                 pipe.WaitForPipeDrain();
             }
         }
+        catch (Exception e) when (e is ObjectDisposedException or IOException or OperationCanceledException)
+        { /* ignored */ }
         finally
         {
-            await pipe.DisposeAsync().ConfigureAwait(false);
+            pipe.Dispose();
         }
     }
 
-    public void Dispose() => Enabled = false;
+    public void Dispose()
+    {
+        if (IsDisposed)
+            return;
+
+        IsDisposed = true;
+        Enabled = false;
+    }
+    private void ThrowIfDisposed()
+    {
+        if (IsDisposed)
+            throw new ObjectDisposedException(null);
+    }
 
     private async ValueTask WriteLineAsync(NamedPipeConnectionContext context, StreamWriter writer, string? value)
     {

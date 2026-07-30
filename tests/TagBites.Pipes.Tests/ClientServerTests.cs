@@ -5,6 +5,9 @@ public class ClientServerTests : PipeTestBase
     [Fact]
     public Task HelloTestAsync() => RequestResponseAsync("1", "2", "ok");
 
+    [Fact]
+    public void RequestEventArgsIsEventArgs() => Assert.True(typeof(EventArgs).IsAssignableFrom(typeof(NamedPipeRequestEventArgs)));
+
     [Theory]
     [InlineData("\\")]
     [InlineData("\\\\")]

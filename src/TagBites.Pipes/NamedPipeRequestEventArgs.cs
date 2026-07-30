@@ -1,6 +1,7 @@
 namespace TagBites.Pipes;
 
-public class NamedPipeRequestEventArgs
+[PublicAPI]
+public class NamedPipeRequestEventArgs : EventArgs
 {
     public NamedPipeConnectionContext Context { get; }
     public string Address { get; }

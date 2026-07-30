@@ -17,6 +17,15 @@ public abstract class PipeTestBase
         return server;
     }
 
+    protected static NamedPipeServer CreateAsyncServer(string pipeName, Func<NamedPipeRequestEventArgs, Task<string?>> handler)
+    {
+        var server = new NamedPipeServer(pipeName);
+        server.Request += (_, e) => e.ResultTask = SetResponseAsync(e, handler);
+        server.Enabled = true;
+        return server;
+    }
+    private static async Task SetResponseAsync(NamedPipeRequestEventArgs e, Func<NamedPipeRequestEventArgs, Task<string?>> handler) => e.Response = await handler(e);
+
     protected static async Task<NamedPipeClient> ConnectAsync(string pipeName)
     {
         var client = new NamedPipeClient(pipeName);

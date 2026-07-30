@@ -16,6 +16,16 @@ public class NamedPipeServer : IDisposable
     public bool SupportLegacyEncoding { get; set; }
     public bool IsDisposed { get; private set; }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the stack trace of a failed request is sent to the client.
+    /// </summary>
+    /// <remarks>
+    /// The client reads it as <see cref="NamedPipeServerRemoteException.RemoteStackTrace"/>. Set to
+    /// <c>false</c> when a process that must not learn about the server internals can open the pipe.
+    /// The exception type and message are always sent. Default: <c>true</c>.
+    /// </remarks>
+    public bool IncludeExceptionStackTrace { get; set; } = true;
+
     public bool Enabled
     {
         get => _enabled;
@@ -166,7 +176,7 @@ public class NamedPipeServer : IDisposable
                     await WriteLineAsync(context, writer, "exception").ConfigureAwait(false);
                     await WriteLineAsync(context, writer, exception.GetType().FullName).ConfigureAwait(false);
                     await WriteLineAsync(context, writer, exception.Message).ConfigureAwait(false);
-                    await WriteLineAsync(context, writer, exception.StackTrace).ConfigureAwait(false);
+                    await WriteLineAsync(context, writer, IncludeExceptionStackTrace ? exception.StackTrace : null).ConfigureAwait(false);
                 }
 
                 pipe.WaitForPipeDrain();

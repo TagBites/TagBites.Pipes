@@ -22,4 +22,9 @@
     <Using Include="JetBrains.Annotations" />
   </ItemGroup>
 
+  <!-- Tests -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="TagBites.Pipes.Tests" />
+  </ItemGroup>
+
 </Project>

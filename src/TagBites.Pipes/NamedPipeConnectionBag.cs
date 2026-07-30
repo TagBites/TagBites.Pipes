@@ -1,9 +1,16 @@
+using System.Collections.Concurrent;
+
 namespace TagBites.Pipes;
 
+[PublicAPI]
 public class NamedPipeConnectionBag
 {
-    private IDictionary<string, object>? _cache;
+    private readonly ConcurrentDictionary<string, object> _cache = new();
 
+    /// <summary>
+    /// Gets or sets the value stored under the given name.
+    /// </summary>
+    /// <remarks>Assigning <c>null</c> removes the entry. Reading a name that was never set returns <c>null</c>.</remarks>
     public object? this[string name]
     {
         get
@@ -11,17 +18,15 @@ public class NamedPipeConnectionBag
             if (name == null)
                 throw new ArgumentNullException(nameof(name));
 
-            return _cache?.TryGetValue(name, out var v) == true ? v : null;
+            return _cache.TryGetValue(name, out var value) ? value : null;
         }
         set
         {
             if (name == null)
                 throw new ArgumentNullException(nameof(name));
 
-            _cache ??= new Dictionary<string, object>();
-
             if (value == null)
-                _cache.Remove(name);
+                _cache.TryRemove(name, out _);
             else
                 _cache[name] = value;
         }

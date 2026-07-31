@@ -179,6 +179,88 @@ public class NamedPipeClient : IDisposable
         return SendRequestCore(address, message);
     }
 
+    /// <summary>
+    /// Sends a request written by a callback and reads the response with another one, so neither side has to hold the whole payload in memory.
+    /// </summary>
+    /// <param name="address">The address naming the operation. It must not start with <c>--</c>.</param>
+    /// <param name="writeMessage">Writes the request body.</param>
+    /// <param name="readResponse">Reads the response body.</param>
+    /// <returns>Whatever <paramref name="readResponse"/> returns.</returns>
+    /// <exception cref="NotSupportedException">
+    /// The connection agreed on an encoding older than version <c>3</c>, which carries text only.
+    /// </exception>
+    /// <inheritdoc cref="SendRequest" path="/exception[@cref!='System.NotSupportedException']"/>
+    public async Task<T> SendRequestAsync<T>(string address, Func<Stream, Task> writeMessage, Func<Stream, Task<T>> readResponse)
+    {
+        if (writeMessage == null)
+            throw new ArgumentNullException(nameof(writeMessage));
+        if (readResponse == null)
+            throw new ArgumentNullException(nameof(readResponse));
+
+        ValidateAddress(address);
+        ThrowIfDisposed();
+
+        var channel = RequireBinaryChannel();
+
+        try
+        {
+            await channel.WriteAsync(address).ConfigureAwait(false);
+            await channel.WriteAsync(writeMessage).ConfigureAwait(false);
+
+            var responseType = await ReadLineAsync().ConfigureAwait(false);
+            switch (responseType)
+            {
+                case "ok":
+                    {
+                        var stream = await channel.OpenReadAsync().ConfigureAwait(false);
+                        if (stream == null)
+                            throw ConnectionLost();
+
+                        var result = await readResponse(stream).ConfigureAwait(false);
+
+                        // The rest has to go, or the next request starts inside this response.
+                        if (stream is NamedPipeFrameReadStream unread)
+                            await unread.DrainAsync().ConfigureAwait(false);
+
+                        return result;
+                    }
+
+                case "exception":
+                    throw await ReadRemoteExceptionAsync().ConfigureAwait(false);
+
+                default:
+                    throw new NotSupportedException($"Unknown server response '{responseType}'.");
+            }
+        }
+        catch (IOException)
+        {
+            throw ConnectionLost();
+        }
+    }
+
+    /// <summary>
+    /// Sends the given bytes and returns the bytes that come back.
+    /// </summary>
+    /// <remarks>
+    /// A separate name rather than an overload of <see cref="SendRequestAsync(string,string)"/>,
+    /// so that a call passing a plain <c>null</c> keeps compiling.
+    /// </remarks>
+    /// <inheritdoc cref="SendRequestAsync{T}" path="/param|/exception"/>
+    public Task<byte[]> SendBytesAsync(string address, byte[] message)
+    {
+        if (message == null)
+            throw new ArgumentNullException(nameof(message));
+
+        return SendRequestAsync(address,
+            stream => stream.WriteAsync(message, 0, message.Length),
+            async stream =>
+            {
+                using var memory = new MemoryStream();
+                await stream.CopyToAsync(memory).ConfigureAwait(false);
+                return memory.ToArray();
+            });
+    }
+
     /// <inheritdoc cref="SendRequest"/>
     public async Task<string> SendRequestAsync(string address, string message)
     {
@@ -265,13 +347,35 @@ public class NamedPipeClient : IDisposable
     }
     private static void ValidateRequest(string address, string message)
     {
-        if (address == null)
-            throw new ArgumentNullException(nameof(address));
+        ValidateAddress(address);
+
         if (message == null)
             throw new ArgumentNullException(nameof(message));
+    }
+    private static void ValidateAddress(string address)
+    {
+        if (address == null)
+            throw new ArgumentNullException(nameof(address));
 
         if (address.StartsWith(InternalCommandNames.Prefix))
             throw new ArgumentException($"An address must not start with '{InternalCommandNames.Prefix}', the prefix is reserved for internal commands.", nameof(address));
+    }
+    private NamedPipeBinaryChannel RequireBinaryChannel()
+    {
+        if (_client == null)
+            throw new InvalidOperationException("The client is not connected.");
+        if (_channel is not NamedPipeBinaryChannel binary)
+            throw new NotSupportedException($"The connection agreed on encoding version {EncodeVersion}, which carries text only. Version {NamedPipeUtils.FrameEncodeVersion} is needed to send bytes.");
+
+        return binary;
+    }
+    private async Task<NamedPipeServerRemoteException> ReadRemoteExceptionAsync()
+    {
+        var type = await ReadLineAsync().ConfigureAwait(false);
+        var message = await ReadLineAsync().ConfigureAwait(false);
+        var stackTrace = await ReadLineAsync().ConfigureAwait(false);
+
+        return new NamedPipeServerRemoteException(type, message, stackTrace);
     }
 
     private void WriteLine(string value) => _channel!.Write(value);

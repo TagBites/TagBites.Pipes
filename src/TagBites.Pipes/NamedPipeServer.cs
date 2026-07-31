@@ -1,5 +1,6 @@
 using System.IO.Pipes;
 using System.Reflection;
+using System.Text;
 
 namespace TagBites.Pipes;
 
@@ -53,6 +54,18 @@ public class NamedPipeServer : IDisposable
     /// The exception type and message are always sent. Default: <c>true</c>.
     /// </remarks>
     public bool IncludeExceptionStackTrace { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether a request reaches the handler as a stream rather than a string.
+    /// </summary>
+    /// <remarks>
+    /// Turn this on to read a large request without holding it in memory, through
+    /// <see cref="NamedPipeRequestEventArgs.MessageStream"/>.
+    /// <see cref="NamedPipeRequestEventArgs.Message"/> then throws, because the message is never built as a string.
+    /// Existing handlers keep working while this stays off.
+    /// Default: <c>false</c>.
+    /// </remarks>
+    public bool UseMessageStream { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether the server listens for connections.
@@ -163,21 +176,21 @@ public class NamedPipeServer : IDisposable
             {
                 // Input
                 var address = await channel.ReadAsync().ConfigureAwait(false);
-                var message = address != null
-                    ? await channel.ReadAsync().ConfigureAwait(false)
-                    : null;
-
-                // End of stream
-                if (address == null || message == null)
+                if (address == null)
                     break;
 
                 string? response = null;
                 Exception? exception = null;
+                Func<Stream, Task>? responseWriter = null;
                 var agreed = NamedPipeUtils.UnknownEncodeVersion;
 
                 // Internal command
                 if (address.StartsWith(InternalCommandNames.Prefix))
                 {
+                    var message = await channel.ReadAsync().ConfigureAwait(false);
+                    if (message == null)
+                        break;
+
                     if (address == InternalCommandNames.ConfigEncodeVersion)
                         if (negotiated)
                             exception = new InvalidOperationException("The encoding is agreed once, when the connection opens.");
@@ -190,19 +203,65 @@ public class NamedPipeServer : IDisposable
                 // Execute
                 else
                 {
-                    try
+                    NamedPipeRequestEventArgs? e = null;
+
+                    if (UseMessageStream)
                     {
-                        var e = new NamedPipeRequestEventArgs(context, address, message);
-                        Request?.Invoke(this, e);
+                        var messageStream = await channel.OpenReadAsync().ConfigureAwait(false);
+                        if (messageStream == null)
+                            break;
 
-                        if (e.ResultTask is { } t)
-                            await t.ConfigureAwait(false);
-
-                        response = e.Response;
+                        e = new NamedPipeRequestEventArgs(context, address, messageStream);
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        exception = ex;
+                        string? message = null;
+                        try
+                        {
+                            message = await channel.ReadAsync().ConfigureAwait(false);
+                        }
+                        catch (DecoderFallbackException)
+                        {
+                            // Bytes that are not text, sent to a handler that reads a string
+                            exception = new NotSupportedException($"The request is not text. Turn on {nameof(UseMessageStream)} to receive it as {nameof(NamedPipeRequestEventArgs.MessageStream)}.");
+                        }
+
+                        if (exception == null)
+                        {
+                            if (message == null)
+                                break;
+
+                            e = new NamedPipeRequestEventArgs(context, address, message);
+                        }
+                    }
+
+                    if (e != null)
+                    {
+                        try
+                        {
+                            Request?.Invoke(this, e);
+
+                            if (e.ResultTask is { } t)
+                                await t.ConfigureAwait(false);
+
+                            response = e.Response;
+                            responseWriter = e.ResponseWriter;
+                        }
+                        catch (Exception ex)
+                        {
+                            exception = ex;
+                        }
+
+                        // The handler may have read part of the message, or none of it
+                        if (e.MessageStream is NamedPipeFrameReadStream unread)
+                            await unread.DrainAsync().ConfigureAwait(false);
+
+                        // Checked before the answer starts, so the failure still reaches the client
+                        if (responseWriter != null && channel is not NamedPipeBinaryChannel)
+                        {
+                            exception = new NotSupportedException($"A streamed response needs encoding version {NamedPipeUtils.FrameEncodeVersion}. This connection agreed on an older one, which carries text only.");
+                            responseWriter = null;
+                        }
                     }
                 }
 
@@ -210,7 +269,11 @@ public class NamedPipeServer : IDisposable
                 if (exception == null)
                 {
                     await channel.WriteAsync("ok").ConfigureAwait(false);
-                    await channel.WriteAsync(response).ConfigureAwait(false);
+
+                    if (responseWriter != null)
+                        await ((NamedPipeBinaryChannel)channel).WriteAsync(responseWriter).ConfigureAwait(false);
+                    else
+                        await channel.WriteAsync(response).ConfigureAwait(false);
                 }
                 else
                 {

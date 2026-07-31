@@ -3,6 +3,13 @@ using System.Reflection;
 
 namespace TagBites.Pipes;
 
+/// <summary>
+/// Accepts client connections on a named pipe and raises <see cref="Request"/> for every request.
+/// </summary>
+/// <remarks>
+/// The server accepts nothing until <see cref="Enabled"/> is set to <c>true</c>. Each connection is
+/// served on its own task, so requests from different clients run in parallel.
+/// </remarks>
 [PublicAPI]
 public class NamedPipeServer : IDisposable
 {
@@ -10,10 +17,38 @@ public class NamedPipeServer : IDisposable
     private bool _enabled;
     private CancellationTokenSource? _cancellationTokenSource;
 
+    /// <summary>
+    /// Occurs when a client sends a request.
+    /// </summary>
+    /// <remarks>
+    /// The handler runs on a thread pool thread and has no synchronization context, so code that
+    /// touches a user interface has to marshal itself. Set
+    /// <see cref="NamedPipeRequestEventArgs.Response"/> to answer, or
+    /// <see cref="NamedPipeRequestEventArgs.ResultTask"/> to answer asynchronously. An exception
+    /// thrown here reaches the client as <see cref="NamedPipeServerRemoteException"/>.
+    /// </remarks>
     public event EventHandler<NamedPipeRequestEventArgs>? Request;
 
+    /// <summary>
+    /// Gets the name of the pipe the server listens on.
+    /// </summary>
     public string PipeName { get; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether a client that does not negotiate an encoding is
+    /// served with the encoding that predates version 2.
+    /// </summary>
+    /// <remarks>
+    /// Every released version of this library speaks version 2, so leaving this off is correct for
+    /// all of them. Turn it on only for a peer built before version 2 existed. Version 1 escapes
+    /// line breaks only and drops trailing whitespace, so turning it on for a peer that speaks
+    /// version 2 corrupts backslashes. Default: <c>false</c>.
+    /// </remarks>
     public bool SupportLegacyEncoding { get; set; }
+
+    /// <summary>
+    /// Gets a value indicating whether the server has been disposed.
+    /// </summary>
     public bool IsDisposed { get; private set; }
 
     /// <summary>
@@ -26,6 +61,14 @@ public class NamedPipeServer : IDisposable
     /// </remarks>
     public bool IncludeExceptionStackTrace { get; set; } = true;
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the server listens for connections.
+    /// </summary>
+    /// <remarks>
+    /// The server listens as soon as this is set to <c>true</c>. Setting it to <c>false</c> stops
+    /// accepting and closes every connection that is still open, so a client in the middle of a
+    /// request gets <see cref="NamedPipeConnectionLostException"/>. Default: <c>false</c>.
+    /// </remarks>
     public bool Enabled
     {
         get => _enabled;
@@ -63,6 +106,11 @@ public class NamedPipeServer : IDisposable
         }
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NamedPipeServer"/> class.
+    /// </summary>
+    /// <param name="pipeName">The name of the pipe to listen on.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="pipeName"/> is <c>null</c>.</exception>
     public NamedPipeServer(string pipeName)
     {
         if (pipeName == null)
@@ -190,6 +238,9 @@ public class NamedPipeServer : IDisposable
         }
     }
 
+    /// <summary>
+    /// Stops the server and closes every open connection. The instance cannot be enabled again.
+    /// </summary>
     public void Dispose()
     {
         if (IsDisposed)

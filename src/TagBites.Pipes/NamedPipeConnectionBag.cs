@@ -2,6 +2,10 @@ using System.Collections.Concurrent;
 
 namespace TagBites.Pipes;
 
+/// <summary>
+/// Stores values that live as long as one connection, keyed by name.
+/// </summary>
+/// <remarks>Safe for concurrent use.</remarks>
 [PublicAPI]
 public class NamedPipeConnectionBag
 {

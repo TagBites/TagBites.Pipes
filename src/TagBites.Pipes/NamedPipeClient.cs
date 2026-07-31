@@ -2,6 +2,13 @@ using System.IO.Pipes;
 
 namespace TagBites.Pipes;
 
+/// <summary>
+/// Sends requests to a <see cref="NamedPipeServer"/> on the local machine over a single connection.
+/// </summary>
+/// <remarks>
+/// One instance serves one request at a time and is not safe for concurrent use. Use
+/// <see cref="NamedPipeClientPool"/> to send requests from several threads.
+/// </remarks>
 [PublicAPI]
 public class NamedPipeClient : IDisposable
 {
@@ -11,12 +18,33 @@ public class NamedPipeClient : IDisposable
     private StreamReader? _reader;
     private StreamWriter? _writer;
 
+    /// <summary>
+    /// Gets the name of the pipe the client connects to.
+    /// </summary>
     public string PipeName { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether the connection is believed to be alive.
+    /// </summary>
+    /// <remarks>
+    /// This turns to <c>false</c> once a request fails or the client is disposed. A connection that
+    /// the other side dropped while idle still reads as <c>true</c>, because a named pipe reveals
+    /// that only when it is used.
+    /// </remarks>
     public bool IsConnected { get; private set; }
+
+    /// <summary>
+    /// Gets a value indicating whether the client has been disposed.
+    /// </summary>
     public bool IsDisposed { get; private set; }
 
     internal int EncodeVersion { get; set; }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NamedPipeClient"/> class.
+    /// </summary>
+    /// <param name="pipeName">The name of the pipe to connect to.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="pipeName"/> is <c>null</c>.</exception>
     public NamedPipeClient(string pipeName)
     {
         if (pipeName == null)
@@ -26,7 +54,16 @@ public class NamedPipeClient : IDisposable
     }
 
 
+    /// <inheritdoc cref="Connect(int)"/>
     public void Connect() => Connect(DefaultConnectTimeout);
+
+    /// <summary>
+    /// Opens the connection and agrees an encoding with the server. Returns at once when the client
+    /// is already connected.
+    /// </summary>
+    /// <param name="timeout">How long to wait for the server, in milliseconds. Default: <c>100</c>.</param>
+    /// <exception cref="TimeoutException">The server did not accept within the timeout.</exception>
+    /// <exception cref="ObjectDisposedException">The client has been disposed.</exception>
     public void Connect(int timeout)
     {
         ThrowIfDisposed();
@@ -52,7 +89,12 @@ public class NamedPipeClient : IDisposable
         _ = ProcessConfigAsync(true);
     }
 
+    /// <inheritdoc cref="ConnectAsync(int,CancellationToken)"/>
     public Task ConnectAsync() => ConnectAsync(DefaultConnectTimeout, CancellationToken.None);
+
+    /// <inheritdoc cref="Connect(int)"/>
+    /// <param name="timeout">How long to wait for the server, in milliseconds. Default: <c>100</c>.</param>
+    /// <param name="token">The token that cancels waiting for the server.</param>
     public async Task ConnectAsync(int timeout, CancellationToken token)
     {
         ThrowIfDisposed();
@@ -103,12 +145,25 @@ public class NamedPipeClient : IDisposable
             ? SendRequestCore(command, message)
             : await SendRequestCoreAsync(command, message).ConfigureAwait(false);
     }
+    /// <summary>
+    /// Sends a request and waits for the response.
+    /// </summary>
+    /// <param name="address">The address naming the operation. It must not start with <c>--</c>.</param>
+    /// <param name="message">The message to send.</param>
+    /// <returns>The response text, which is empty when the handler set no response.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="address"/> or <paramref name="message"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="address"/> starts with <c>--</c>, which is reserved.</exception>
+    /// <exception cref="InvalidOperationException">The client is not connected.</exception>
+    /// <exception cref="NamedPipeConnectionLostException">The connection broke while sending or receiving.</exception>
+    /// <exception cref="NamedPipeServerRemoteException">The request handler on the server failed.</exception>
     public string SendRequest(string address, string message)
     {
         ValidateRequest(address, message);
 
         return SendRequestCore(address, message);
     }
+
+    /// <inheritdoc cref="SendRequest"/>
     public async Task<string> SendRequestAsync(string address, string message)
     {
         ValidateRequest(address, message);
@@ -239,6 +294,9 @@ public class NamedPipeClient : IDisposable
         return new NamedPipeConnectionLostException();
     }
 
+    /// <summary>
+    /// Closes the connection. The instance cannot be connected again.
+    /// </summary>
     public void Dispose()
     {
         if (IsDisposed)

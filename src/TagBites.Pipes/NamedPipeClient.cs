@@ -143,6 +143,11 @@ public class NamedPipeClient : IDisposable
                 EncodeVersion = NamedPipeUtils.LegacyEncodeVersion;
             }
 
+        // A peer that does not answer predates the handshake, so it speaks version 1.
+        // The encoder is the same for both numbers, so only the reported version changes.
+        if (EncodeVersion == NamedPipeUtils.UnknownEncodeVersion)
+            EncodeVersion = NamedPipeUtils.LegacyEncodeVersion;
+
         // The server switches right after it answered, so both sides change at the same point.
         if (EncodeVersion == NamedPipeUtils.FrameEncodeVersion)
             UpgradeToFrames();

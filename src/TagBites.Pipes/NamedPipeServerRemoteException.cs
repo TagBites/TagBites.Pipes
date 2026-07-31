@@ -4,8 +4,10 @@ namespace TagBites.Pipes;
 /// The exception that is thrown when the request handler on the server side fails.
 /// </summary>
 /// <remarks>
-/// The original exception cannot cross the pipe, so its type name, message and stack trace are carried as text. The server decides whether to send the stack trace, see
-/// <see cref="NamedPipeServer.IncludeExceptionStackTrace"/>.
+/// The original exception cannot cross the pipe,
+/// so its type name, message and stack trace are carried as text.
+/// The server decides whether to send the stack trace,
+/// see <see cref="NamedPipeServer.IncludeExceptionStackTrace"/>.
 /// </remarks>
 [PublicAPI]
 public class NamedPipeServerRemoteException : Exception

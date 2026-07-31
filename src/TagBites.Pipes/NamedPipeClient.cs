@@ -6,8 +6,8 @@ namespace TagBites.Pipes;
 /// Sends requests to a <see cref="NamedPipeServer"/> on the local machine over a single connection.
 /// </summary>
 /// <remarks>
-/// One instance serves one request at a time and is not safe for concurrent use. Use
-/// <see cref="NamedPipeClientPool"/> to send requests from several threads.
+/// One instance serves one request at a time and is not safe for concurrent use.
+/// Use <see cref="NamedPipeClientPool"/> to send requests from several threads.
 /// </remarks>
 [PublicAPI]
 public class NamedPipeClient : IDisposable
@@ -27,7 +27,9 @@ public class NamedPipeClient : IDisposable
     /// Gets a value indicating whether the connection is believed to be alive.
     /// </summary>
     /// <remarks>
-    /// This turns to <c>false</c> once a request fails or the client is disposed. A connection that the other side dropped while idle still reads as <c>true</c>, because a named pipe reveals that only when it is used.
+    /// This turns to <c>false</c> once a request fails or the client is disposed.
+    /// A connection that the other side dropped while idle still reads as <c>true</c>,
+    /// because a named pipe reveals that only when it is used.
     /// </remarks>
     public bool IsConnected { get; private set; }
 

@@ -3,10 +3,14 @@ using System.Collections.Concurrent;
 namespace TagBites.Pipes;
 
 /// <summary>
-/// Keeps a bounded set of reusable connections to a <see cref="NamedPipeServer"/> and hands them out to callers, so several threads can send requests at once.
+/// Keeps a bounded set of reusable connections to a <see cref="NamedPipeServer"/> and hands them out to callers,
+/// so several threads can send requests at once.
 /// </summary>
 /// <remarks>
-/// The pool does not guarantee a live connection. A connection that the server dropped while it sat idle fails the next request with <see cref="NamedPipeConnectionLostException"/>; the pool then discards it, so the request after that gets a fresh one. Callers have to handle that exception.
+/// The pool does not guarantee a live connection.
+/// A connection that the server dropped while it sat idle fails the next request with <see cref="NamedPipeConnectionLostException"/>.
+/// The pool then discards it, so the request after that gets a fresh one.
+/// Callers have to handle that exception.
 /// A caller blocks while every connection is busy.
 /// </remarks>
 [PublicAPI]

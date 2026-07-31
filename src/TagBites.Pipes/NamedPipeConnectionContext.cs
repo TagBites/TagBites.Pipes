@@ -1,8 +1,7 @@
 namespace TagBites.Pipes;
 
 /// <summary>
-/// Represents one client connection on the server side, and carries state that lives as long as
-/// that connection.
+/// Represents one client connection on the server side, and carries state that lives as long as that connection.
 /// </summary>
 /// <remarks>The server owns the lifetime of this object. Consumers do not dispose it.</remarks>
 [PublicAPI]

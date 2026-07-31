@@ -27,9 +27,7 @@ public class NamedPipeClient : IDisposable
     /// Gets a value indicating whether the connection is believed to be alive.
     /// </summary>
     /// <remarks>
-    /// This turns to <c>false</c> once a request fails or the client is disposed. A connection that
-    /// the other side dropped while idle still reads as <c>true</c>, because a named pipe reveals
-    /// that only when it is used.
+    /// This turns to <c>false</c> once a request fails or the client is disposed. A connection that the other side dropped while idle still reads as <c>true</c>, because a named pipe reveals that only when it is used.
     /// </remarks>
     public bool IsConnected { get; private set; }
 
@@ -58,8 +56,7 @@ public class NamedPipeClient : IDisposable
     public void Connect() => Connect(DefaultConnectTimeout);
 
     /// <summary>
-    /// Opens the connection and agrees an encoding with the server. Returns at once when the client
-    /// is already connected.
+    /// Opens the connection and agrees an encoding with the server. Returns at once when the client is already connected.
     /// </summary>
     /// <param name="timeout">How long to wait for the server, in milliseconds. Default: <c>100</c>.</param>
     /// <exception cref="TimeoutException">The server did not accept within the timeout.</exception>
@@ -183,7 +180,6 @@ public class NamedPipeClient : IDisposable
             // Input
             WriteLine(address);
             WriteLine(message);
-            _client.WaitForPipeDrain();
 
             // Response
             var responseType = ReadLine();

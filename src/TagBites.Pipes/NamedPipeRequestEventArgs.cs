@@ -31,9 +31,7 @@ public class NamedPipeRequestEventArgs : EventArgs
     /// Gets or sets the task the server waits for before it reads <see cref="Response"/>.
     /// </summary>
     /// <remarks>
-    /// Set this to handle a request asynchronously. The handler assigns the task and returns, and
-    /// the server reads <see cref="Response"/> once the task completes. An exception from the task
-    /// reaches the client the same way as one thrown by the handler itself.
+    /// Set this to handle a request asynchronously. The handler assigns the task and returns, and the server reads <see cref="Response"/> once the task completes. An exception from the task reaches the client the same way as one thrown by the handler itself.
     /// </remarks>
     public Task? ResultTask { get; set; }
 

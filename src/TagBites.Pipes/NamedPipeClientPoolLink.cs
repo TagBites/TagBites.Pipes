@@ -1,12 +1,10 @@
 namespace TagBites.Pipes;
 
 /// <summary>
-/// Holds one connection taken from a <see cref="NamedPipeClientPool"/> for as long as the link is
-/// alive, so several requests run on the same connection.
+/// Holds one connection taken from a <see cref="NamedPipeClientPool"/> for as long as the link is alive, so several requests run on the same connection.
 /// </summary>
 /// <remarks>
-/// Disposing the link returns the connection to the pool. Until then the pool cannot hand that
-/// connection to anyone else, so a link that is never disposed shrinks the pool by one.
+/// Disposing the link returns the connection to the pool. Until then the pool cannot hand that connection to anyone else, so a link that is never disposed shrinks the pool by one.
 /// </remarks>
 [PublicAPI]
 public class NamedPipeClientPoolLink : IDisposable

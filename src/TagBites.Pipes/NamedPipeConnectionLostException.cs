@@ -4,8 +4,7 @@ namespace TagBites.Pipes;
 /// The exception that is thrown when the connection to the other side of the pipe is gone.
 /// </summary>
 /// <remarks>
-/// A request that fails this way has an unknown outcome. The other side may have processed it
-/// before the connection broke.
+/// A request that fails this way has an unknown outcome. The other side may have processed it before the connection broke.
 /// </remarks>
 [PublicAPI]
 public class NamedPipeConnectionLostException : Exception

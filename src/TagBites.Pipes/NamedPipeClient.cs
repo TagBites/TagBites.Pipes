@@ -305,6 +305,9 @@ public class NamedPipeClient : IDisposable
     {
         IsConnected = false;
 
+        // The version belongs to the connection, so the next one negotiates from scratch.
+        _encodeVersion = NamedPipeUtils.UnknownEncodeVersion;
+
         Dispose(ref _channel);
         Dispose(ref _client);
     }

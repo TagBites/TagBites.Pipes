@@ -15,7 +15,7 @@ public class NamedPipeClient : IDisposable
     private const int DefaultConnectTimeout = 100;
 
     private NamedPipeClientStream? _client;
-    private NamedPipeTextChannel? _channel;
+    private NamedPipeChannel? _channel;
     private int _encodeVersion;
 
     /// <summary>
@@ -44,8 +44,8 @@ public class NamedPipeClient : IDisposable
             _encodeVersion = value;
 
             // The version can be set before the connection exists, so the channel is kept in step.
-            if (_channel != null)
-                _channel.EncodeVersion = value;
+            if (_channel is NamedPipeTextChannel text)
+                text.EncodeVersion = value;
         }
     }
 
@@ -142,6 +142,16 @@ public class NamedPipeClient : IDisposable
             {
                 EncodeVersion = NamedPipeUtils.LegacyEncodeVersion;
             }
+
+        // The server switches right after it answered, so both sides change at the same point.
+        if (EncodeVersion == NamedPipeUtils.FrameEncodeVersion)
+            UpgradeToFrames();
+    }
+    private void UpgradeToFrames()
+    {
+        var previous = _channel;
+        _channel = new NamedPipeFrameChannel(_client!);
+        previous?.Dispose();
     }
 
     private async Task<string> SendRequestAsync(string command, string message, bool sync)

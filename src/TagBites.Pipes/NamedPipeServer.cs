@@ -148,13 +148,16 @@ public class NamedPipeServer : IDisposable
         // Unblocks the pending read
         using var registration = token.Register(pipe.Dispose);
 
+        // A peer that does not negotiate speaks text, so version 3 is never the default.
+        NamedPipeChannel channel = new NamedPipeTextChannel(pipe)
+        {
+            EncodeVersion = SupportLegacyEncoding ? NamedPipeUtils.LegacyEncodeVersion : NamedPipeUtils.TextEncodeVersion
+        };
+
         try
         {
             using var context = new NamedPipeConnectionContext();
-            using var channel = new NamedPipeTextChannel(pipe)
-            {
-                EncodeVersion = SupportLegacyEncoding ? NamedPipeUtils.LegacyEncodeVersion : NamedPipeUtils.CurrentEncodeVersion
-            };
+            var negotiated = false;
 
             while (!token.IsCancellationRequested)
             {
@@ -170,15 +173,18 @@ public class NamedPipeServer : IDisposable
 
                 string? response = null;
                 Exception? exception = null;
+                var agreed = NamedPipeUtils.UnknownEncodeVersion;
 
                 // Internal command
                 if (address.StartsWith(InternalCommandNames.Prefix))
                 {
                     if (address == InternalCommandNames.ConfigEncodeVersion)
-                        if (int.TryParse(message, out var version))
+                        if (negotiated)
+                            exception = new InvalidOperationException("The encoding is agreed once, when the connection opens.");
+                        else if (int.TryParse(message, out var version))
                         {
-                            channel.EncodeVersion = Math.Max(NamedPipeUtils.LegacyEncodeVersion, Math.Min(NamedPipeUtils.CurrentEncodeVersion, version));
-                            response = channel.EncodeVersion.ToString();
+                            agreed = Math.Max(NamedPipeUtils.LegacyEncodeVersion, Math.Min(NamedPipeUtils.CurrentEncodeVersion, version));
+                            response = agreed.ToString();
                         }
                 }
                 // Execute
@@ -216,12 +222,25 @@ public class NamedPipeServer : IDisposable
                     await channel.WriteAsync(exception.Message).ConfigureAwait(false);
                     await channel.WriteAsync(IncludeExceptionStackTrace ? exception.StackTrace : null).ConfigureAwait(false);
                 }
+
+                // Applied after the answer, which the client still reads on the previous channel
+                negotiated = true;
+
+                if (agreed == NamedPipeUtils.FrameEncodeVersion)
+                {
+                    var previous = channel;
+                    channel = new NamedPipeFrameChannel(pipe);
+                    previous.Dispose();
+                }
+                else if (agreed != NamedPipeUtils.UnknownEncodeVersion)
+                    ((NamedPipeTextChannel)channel).EncodeVersion = agreed;
             }
         }
-        catch (Exception e) when (e is ObjectDisposedException or IOException or OperationCanceledException)
+        catch (Exception e) when (e is ObjectDisposedException or IOException or OperationCanceledException or InvalidDataException)
         { /* ignored */ }
         finally
         {
+            channel.Dispose();
             pipe.Dispose();
         }
     }

@@ -6,7 +6,10 @@ internal static class NamedPipeUtils
 {
     public const int UnknownEncodeVersion = 0;
     public const int LegacyEncodeVersion = 1;
-    public const int CurrentEncodeVersion = 2;
+    public const int TextEncodeVersion = 2;
+    public const int FrameEncodeVersion = 3;
+
+    public const int CurrentEncodeVersion = FrameEncodeVersion;
 
 
     public static Func<string?, string> GetEncoder(int version) => version > 1 ? Encode2 : Encode;

@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace TagBites.Pipes;
 
 /// <summary>
@@ -12,8 +14,9 @@ internal sealed class NamedPipeTextChannel : NamedPipeChannel
 
     public NamedPipeTextChannel(Stream stream)
     {
-        _reader = new StreamReader(stream);
-        _writer = new StreamWriter(stream) { AutoFlush = true };
+        // The pipe outlives this channel, because a connection can move on to another version.
+        _reader = new StreamReader(stream, Encoding.UTF8, true, 1024, true);
+        _writer = new StreamWriter(stream, new UTF8Encoding(false, true), 1024, true) { AutoFlush = true };
     }
 
 

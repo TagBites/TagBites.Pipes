@@ -15,8 +15,8 @@ public class NamedPipeClient : IDisposable
     private const int DefaultConnectTimeout = 100;
 
     private NamedPipeClientStream? _client;
-    private StreamReader? _reader;
-    private StreamWriter? _writer;
+    private NamedPipeTextChannel? _channel;
+    private int _encodeVersion;
 
     /// <summary>
     /// Gets the name of the pipe the client connects to.
@@ -36,7 +36,18 @@ public class NamedPipeClient : IDisposable
     /// </summary>
     public bool IsDisposed { get; private set; }
 
-    internal int EncodeVersion { get; set; }
+    internal int EncodeVersion
+    {
+        get => _encodeVersion;
+        set
+        {
+            _encodeVersion = value;
+
+            // The version can be set before the connection exists, so the channel is kept in step.
+            if (_channel != null)
+                _channel.EncodeVersion = value;
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="NamedPipeClient"/> class.
@@ -76,8 +87,7 @@ public class NamedPipeClient : IDisposable
         _client = CreateStream();
         _client.Connect(timeout);
 
-        _reader = new StreamReader(_client);
-        _writer = new StreamWriter(_client) { AutoFlush = true };
+        _channel = new NamedPipeTextChannel(_client) { EncodeVersion = _encodeVersion };
 
         // Connected
         IsConnected = true;
@@ -107,8 +117,7 @@ public class NamedPipeClient : IDisposable
         _client = CreateStream();
         await _client.ConnectAsync(timeout, token).ConfigureAwait(false);
 
-        _reader = new StreamReader(_client);
-        _writer = new StreamWriter(_client) { AutoFlush = true };
+        _channel = new NamedPipeTextChannel(_client) { EncodeVersion = _encodeVersion };
 
         // Connected
         IsConnected = true;
@@ -218,7 +227,6 @@ public class NamedPipeClient : IDisposable
             // Input
             await WriteLineAsync(address).ConfigureAwait(false);
             await WriteLineAsync(message).ConfigureAwait(false);
-            await _writer!.FlushAsync().ConfigureAwait(false);
 
             // Response
             var responseType = await ReadLineAsync().ConfigureAwait(false);
@@ -256,32 +264,24 @@ public class NamedPipeClient : IDisposable
             throw new ArgumentException($"An address must not start with '{InternalCommandNames.Prefix}', the prefix is reserved for internal commands.", nameof(address));
     }
 
-    private void WriteLine(string value)
-    {
-        value = NamedPipeUtils.GetEncoder(EncodeVersion)(value);
-        _writer!.WriteLine(value);
-    }
+    private void WriteLine(string value) => _channel!.Write(value);
     private string ReadLine()
     {
-        var line = _reader!.ReadLine();
-        if (line == null)
+        var value = _channel!.Read();
+        if (value == null)
             throw ConnectionLost();
 
-        return NamedPipeUtils.GetDecoder(EncodeVersion)(line);
+        return value;
     }
 
-    private async ValueTask WriteLineAsync(string value)
-    {
-        value = NamedPipeUtils.GetEncoder(EncodeVersion)(value);
-        await _writer!.WriteLineAsync(value).ConfigureAwait(false);
-    }
+    private async ValueTask WriteLineAsync(string value) => await _channel!.WriteAsync(value).ConfigureAwait(false);
     private async ValueTask<string> ReadLineAsync()
     {
-        var line = await _reader!.ReadLineAsync().ConfigureAwait(false);
-        if (line == null)
+        var value = await _channel!.ReadAsync().ConfigureAwait(false);
+        if (value == null)
             throw ConnectionLost();
 
-        return NamedPipeUtils.GetDecoder(EncodeVersion)(line);
+        return value;
     }
 
     private NamedPipeConnectionLostException ConnectionLost()
@@ -305,8 +305,7 @@ public class NamedPipeClient : IDisposable
     {
         IsConnected = false;
 
-        Dispose(ref _writer);
-        Dispose(ref _reader);
+        Dispose(ref _channel);
         Dispose(ref _client);
     }
     private void ThrowIfDisposed()

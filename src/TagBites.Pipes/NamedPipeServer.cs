@@ -151,18 +151,17 @@ public class NamedPipeServer : IDisposable
         try
         {
             using var context = new NamedPipeConnectionContext();
-            context.EncodeVersion = SupportLegacyEncoding ? NamedPipeUtils.LegacyEncodeVersion : NamedPipeUtils.CurrentEncodeVersion;
-
-            using var reader = new StreamReader(pipe);
-            await using var writer = new StreamWriter(pipe);
-            writer.AutoFlush = true;
+            using var channel = new NamedPipeTextChannel(pipe)
+            {
+                EncodeVersion = SupportLegacyEncoding ? NamedPipeUtils.LegacyEncodeVersion : NamedPipeUtils.CurrentEncodeVersion
+            };
 
             while (!token.IsCancellationRequested)
             {
                 // Input
-                var address = await ReadLineAsync(context, reader).ConfigureAwait(false);
+                var address = await channel.ReadAsync().ConfigureAwait(false);
                 var message = address != null
-                    ? await ReadLineAsync(context, reader).ConfigureAwait(false)
+                    ? await channel.ReadAsync().ConfigureAwait(false)
                     : null;
 
                 // End of stream
@@ -178,8 +177,8 @@ public class NamedPipeServer : IDisposable
                     if (address == InternalCommandNames.ConfigEncodeVersion)
                         if (int.TryParse(message, out var version))
                         {
-                            context.EncodeVersion = Math.Max(NamedPipeUtils.LegacyEncodeVersion, Math.Min(NamedPipeUtils.CurrentEncodeVersion, version));
-                            response = context.EncodeVersion.ToString();
+                            channel.EncodeVersion = Math.Max(NamedPipeUtils.LegacyEncodeVersion, Math.Min(NamedPipeUtils.CurrentEncodeVersion, version));
+                            response = channel.EncodeVersion.ToString();
                         }
                 }
                 // Execute
@@ -204,18 +203,18 @@ public class NamedPipeServer : IDisposable
                 // Response
                 if (exception == null)
                 {
-                    await WriteLineAsync(context, writer, "ok").ConfigureAwait(false);
-                    await WriteLineAsync(context, writer, response).ConfigureAwait(false);
+                    await channel.WriteAsync("ok").ConfigureAwait(false);
+                    await channel.WriteAsync(response).ConfigureAwait(false);
                 }
                 else
                 {
                     if (exception is TargetInvocationException ti)
                         exception = ti.InnerException ?? exception;
 
-                    await WriteLineAsync(context, writer, "exception").ConfigureAwait(false);
-                    await WriteLineAsync(context, writer, exception.GetType().FullName).ConfigureAwait(false);
-                    await WriteLineAsync(context, writer, exception.Message).ConfigureAwait(false);
-                    await WriteLineAsync(context, writer, IncludeExceptionStackTrace ? exception.StackTrace : null).ConfigureAwait(false);
+                    await channel.WriteAsync("exception").ConfigureAwait(false);
+                    await channel.WriteAsync(exception.GetType().FullName).ConfigureAwait(false);
+                    await channel.WriteAsync(exception.Message).ConfigureAwait(false);
+                    await channel.WriteAsync(IncludeExceptionStackTrace ? exception.StackTrace : null).ConfigureAwait(false);
                 }
             }
         }
@@ -242,18 +241,5 @@ public class NamedPipeServer : IDisposable
     {
         if (IsDisposed)
             throw new ObjectDisposedException(null);
-    }
-
-    private async ValueTask WriteLineAsync(NamedPipeConnectionContext context, StreamWriter writer, string? value)
-    {
-        value = NamedPipeUtils.GetEncoder(context.EncodeVersion)(value);
-        await writer.WriteLineAsync(value).ConfigureAwait(false);
-    }
-    private async ValueTask<string?> ReadLineAsync(NamedPipeConnectionContext context, StreamReader reader)
-    {
-        var line = await reader.ReadLineAsync().ConfigureAwait(false);
-        return line != null
-            ? NamedPipeUtils.GetDecoder(context.EncodeVersion)(line)
-            : null;
     }
 }

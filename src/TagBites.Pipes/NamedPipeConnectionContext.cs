@@ -29,8 +29,6 @@ public class NamedPipeConnectionContext : IDisposable
     /// </summary>
     public bool IsDisposed { get; private set; }
 
-    internal int EncodeVersion { get; set; }
-
 
     void IDisposable.Dispose()
     {

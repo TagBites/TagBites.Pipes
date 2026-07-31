@@ -26,7 +26,7 @@ public class EncodingTests : PipeTestBase
     [InlineData("back\\slash", "back\\\\slash")]
     [InlineData("quote'and\"quote", "quote\\'and\\\"quote")]
     [InlineData("null\0char", "null\\0char")]
-    public void CurrentEncodingWireFormat(string value, string expected) => AssertEncodes(NamedPipeUtils.CurrentEncodeVersion, value, expected);
+    public void TextEncodingWireFormat(string value, string expected) => AssertEncodes(NamedPipeUtils.TextEncodeVersion, value, expected);
 
     /// <summary>
     /// Version 1 escapes line breaks only - backslashes and trailing whitespace do not round trip.
@@ -52,7 +52,7 @@ public class EncodingTests : PipeTestBase
     [InlineData("quote'and\"quote")]
     [InlineData("null\0char")]
     [InlineData("escaped\\nnewline\n")]
-    public void CurrentEncodingRoundTrip(string value) => AssertRoundTrip(NamedPipeUtils.CurrentEncodeVersion, value);
+    public void TextEncodingRoundTrip(string value) => AssertRoundTrip(NamedPipeUtils.TextEncodeVersion, value);
 
     [Fact]
     public async Task LegacyConnectionDropsTrailingWhitespaceAsync()

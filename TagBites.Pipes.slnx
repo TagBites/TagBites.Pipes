@@ -13,7 +13,7 @@
     <File Path="Directory.Build.props" />
     <File Path="Directory.Build.targets" />
     <File Path="global.json" />
-    <File Path="LICENSE" />
+    <File Path="LICENSE.md" />
     <File Path="README.md" />
   </Folder>
   <Project Path="src/TagBites.Pipes/TagBites.Pipes.csproj" />

@@ -14,7 +14,7 @@
   <PropertyGroup>
     <Description>Inter-process communication over named pipes for .NET. Provides a request/response server, a client and an optional client connection pool.</Description>
     <PackageTags>ipc; named-pipes; pipes; inter-process-communication; client-server; messaging; netstandard</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
   </PropertyGroup>
 
   <!-- Usings -->

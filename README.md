@@ -2,7 +2,7 @@
 
 [![Nuget](https://img.shields.io/nuget/v/TagBites.Pipes.svg)](https://www.nuget.org/packages/TagBites.Pipes/)
 ![.NET Standard 2.1](https://img.shields.io/badge/.NET%20Standard-2.1-512BD4)
-[![License](https://img.shields.io/github/license/TagBites/TagBites.Pipes)](https://github.com/TagBites/TagBites.Pipes/blob/master/LICENSE)
+[![License](https://img.shields.io/github/license/TagBites/TagBites.Pipes)](https://github.com/TagBites/TagBites.Pipes/blob/master/LICENSE.md)
 [![Downloads](https://img.shields.io/nuget/dt/TagBites.Pipes.svg)](https://www.nuget.org/packages/TagBites.Pipes/)
 
 **TagBites.Pipes sends requests between two processes on the same machine, over a named pipe.**
@@ -186,4 +186,4 @@ A broken connection raises `NamedPipeConnectionLostException`. Such a request ha
 
 - [Changelog](https://github.com/TagBites/TagBites.Pipes/blob/master/CHANGELOG.md)
 - [Security policy](https://github.com/TagBites/TagBites.Pipes/blob/master/SECURITY.md)
-- [License (MIT)](https://github.com/TagBites/TagBites.Pipes/blob/master/LICENSE)
+- [License (Apache-2.0)](https://github.com/TagBites/TagBites.Pipes/blob/master/LICENSE.md)

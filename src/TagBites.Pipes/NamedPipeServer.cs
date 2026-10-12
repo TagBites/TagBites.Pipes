@@ -155,13 +155,10 @@ public class NamedPipeServer : IDisposable
                 { /* ignored */ }
             }
 
-            if (!connected)
-            {
+            if (connected)
+                ProcessPipe(pipe, token);
+            else
                 pipe.Dispose();
-                break;
-            }
-
-            ProcessPipe(pipe, token);
         }
     }
     private void ProcessPipe(NamedPipeServerStream pipe, CancellationToken token)

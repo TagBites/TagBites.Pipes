@@ -1,7 +1,12 @@
+using System.IO.Pipes;
+
 namespace TagBites.Pipes.Tests;
 
 public class ServerLifetimeTests : PipeTestBase
 {
+    private const int DroppedClientCount = 200;
+
+
     [Fact]
     public async Task DisabledServerRefusesConnectionAsync()
     {
@@ -59,6 +64,18 @@ public class ServerLifetimeTests : PipeTestBase
     }
 
     [Fact]
+    public async Task ServerAcceptsConnectionAfterDroppedClientsAsync()
+    {
+        var pipeName = CreatePipeName();
+        using var server = CreateServer(pipeName);
+
+        for (var i = 0; i < DroppedClientCount; i++)
+            await DropClientAsync(pipeName);
+
+        await ServeOneRequestAsync(pipeName);
+    }
+
+    [Fact]
     public async Task DisabledServerClosesActiveConnectionAsync()
     {
         var pipeName = CreatePipeName();
@@ -89,5 +106,10 @@ public class ServerLifetimeTests : PipeTestBase
     {
         using var client = await AssertCompletesAsync(ConnectAsync(pipeName));
         Assert.Equal("pong", await AssertCompletesAsync(client.SendRequestAsync("probe", "x")));
+    }
+    private static async Task DropClientAsync(string pipeName)
+    {
+        using var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+        await AssertCompletesAsync(pipe.ConnectAsync(ConnectTimeout));
     }
 }
